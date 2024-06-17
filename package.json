@@ -84,5 +84,10 @@
   },
   "publishConfig": {
     "tag": "next"
+  },
+  "git": {
+    "scripts": {
+      "pre-push": "npx git-scripts-pre-push"
+    }
   }
 }
