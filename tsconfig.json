@@ -16,6 +16,8 @@
     "examples/**/*.ts",
     "scripts/**/*.ts",
     "src/**/*.ts",
+    "local-server/**/*.ts",
+    "remote-server/**/*.ts",
     "tests/**/*.spec.ts",
   ],
 }

@@ -15,7 +15,7 @@
     "npm": ">=7"
   },
   "dependencies": {
-    "@types/jsonata": "^1.5.1",
+    "axios": "^1.7.2",
     "crypto": "^1.0.1",
     "jsonata": "^2.0.3",
     "mqtt": "^3.0.0",
@@ -26,6 +26,8 @@
     "@chatie/git-scripts": "^0.6.2",
     "@chatie/semver": "^0.4.7",
     "@chatie/tsconfig": "^4.6.2",
+    "@types/axios": "^0.14.0",
+    "@types/jsonata": "^1.5.1",
     "@types/koa": "^2.13.8",
     "@types/koa-bodyparser": "^4.3.10",
     "@types/koa-router": "^7.4.4",
@@ -84,10 +86,5 @@
   },
   "publishConfig": {
     "tag": "next"
-  },
-  "git": {
-    "scripts": {
-      "pre-push": "npx git-scripts-pre-push"
-    }
   }
 }
