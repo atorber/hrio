@@ -1,0 +1,19 @@
+{
+    "name": "vika-hook",
+    "version": "0.1.0",
+    "description": "vika cfc test",
+    "type": "commonjs",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "http2mqtt": "^0.6.6",
+        "uuid": "^9.0.1"
+    },
+    "devDependencies": {
+        "@types/uuid": "^9.0.8"
+    }
+}
