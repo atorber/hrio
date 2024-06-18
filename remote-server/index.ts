@@ -3,39 +3,70 @@ import * as mqtt from 'mqtt'
 import axios from 'axios'
 
 const ops = {
-  http:{
-    port:8888,
+  http: {
+    host: 'http://127.0.0.1',
+    port: 19088,
   },
-  mqtt:{
-    endpoint:'',
-    port:'',
-    username:'',
-    password:'',
-    requestTopic:'',
-    responseTopic:'',
+  mqtt: {
+    // endpoint: 'k8913def.ala.cn-hangzhou.emqxsl.cn',
+    endpoint:'broker.emqx.io',
+    port: '1883',
+    username: 'awgnfty/ledongmao',
+    password: 'DyaBAZphfcOZRuEa',
+    requestTopic: 'request',
+    responseTopic: 'response',
   },
 }
-console.info(ops)
-const mqttClient = mqtt.connect('mqtt://broker.hivemq.com')
-const requestTopic = 'httpRequestTopic'
-const responseTopic = 'httpResponseTopic'
+console.info('ops:', JSON.stringify(ops))
+
+const mqttOptions = ops.mqtt
+console.info('mqttOptions:', mqttOptions)
+const mqttClient = mqtt.connect(`mqtt://${mqttOptions.endpoint}:${mqttOptions.port}`, {
+  password: mqttOptions.password,
+  username: mqttOptions.username,
+  clientId: 'remote-server',
+})
+const requestTopic = mqttOptions.requestTopic + '/+'
+const responseTopic = mqttOptions.responseTopic
 
 mqttClient.on('message', (topic, message) => {
-  if (topic === requestTopic) {
-    const { requestId, method, path, body } = JSON.parse(message.toString())
-    try {
-      // 模拟执行HTTP请求
-      const response:any = axios({ method, url: path, data: body })
+  console.info('Received message:', topic, message.toString())
+  try {
+    const { requestId, payload } = JSON.parse(message.toString())
+    const { method, path, body, headers } = payload
+    console.info('requestId:', requestId)
+    console.info(`${responseTopic}/${requestId}`)
+    // mqttClient.publish(`${responseTopic}/${requestId}`, message.toString())
+    const url = `${ops.http.host}:${ops.http.port}${path}`
+    console.info('url:', url)
+    axios({
+      method,
+      url,
+      data: body,
+    })
+      .then((response) => {
+        mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify(response.data))
+        return response
+      })
+      .catch((error) => {
+        console.error('Axios error:', error)
+        mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify({ error: error.message, stack: error.stack }))
+      })
 
-      // 将响应作为MQTT消息发送回去
-      mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify(response.data))
-    } catch (error:any) {
-      // 发送错误信息
-      mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify({ error: error.message }))
-    }
+  } catch (parseError) {
+    console.error('Error parsing message:', parseError)
   }
 })
 
 mqttClient.on('connect', () => {
+  console.info('Connected to MQTT server')
   mqttClient.subscribe(requestTopic)
+})
+
+mqttClient.on('error', (error) => {
+  console.error('MQTT connection error:', error)
+})
+
+mqttClient.on('close', () => {
+  console.info('MQTT connection closed')
 })

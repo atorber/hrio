@@ -1,6 +1,6 @@
 {
-  "name": "http2mqtt",
-  "version": "0.6.13",
+  "name": "hrio",
+  "version": "0.1.0",
   "description": "Using HTTP requests to publish mqtt messages",
   "type": "module",
   "exports": {
@@ -37,7 +37,6 @@
     "@types/uuid": "^9.0.8",
     "eslint": "^8.48.0",
     "express": "^4.18.2",
-    "http2mqtt": "^0.3.6",
     "koa": "^2.14.2",
     "koa-bodyparser": "^4.4.1",
     "koa-router": "^12.0.0",
@@ -56,6 +55,8 @@
     "start:koa": "cross-env NODE_OPTIONS=\"--no-warnings --loader=ts-node/esm\" node examples/koa.ts",
     "start:express": "cross-env NODE_OPTIONS=\"--no-warnings --loader=ts-node/esm\" node examples/express.ts",
     "start": "npm run quick",
+    "start:local": "cross-env NODE_OPTIONS=\"--no-warnings --loader=ts-node/esm\" node local-server/index.ts",
+    "start:remote": "cross-env NODE_OPTIONS=\"--no-warnings --loader=ts-node/esm\" node remote-server/index.ts",
     "test": "npm-run-all lint",
     "test-test": "npm-run-all lint test:unit",
     "test:pack": "bash -x scripts/npm-pack-testing.sh",
@@ -86,5 +87,10 @@
   },
   "publishConfig": {
     "tag": "next"
+  },
+  "git": {
+    "scripts": {
+      "pre-push": "npx git-scripts-pre-push"
+    }
   }
 }
