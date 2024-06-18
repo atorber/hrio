@@ -43,6 +43,7 @@ mqttClient.on('message', (topic, message) => {
       method,
       url,
       data: body,
+      headers,
     })
       .then((response) => {
         mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify(response.data))
