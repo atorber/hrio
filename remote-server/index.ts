@@ -1,24 +1,25 @@
 /* eslint-disable sort-keys */
+import 'dotenv/config.js'
 import * as mqtt from 'mqtt'
 import axios from 'axios'
 import { decrypt, encrypt, getKey, DecryptedMessage } from './utils.js'
 
-const ops = {
+const ops: any = {
   http: {
-    host: 'http://127.0.0.1',
-    port: 19088,
+    host: process.env['http_host_remote'] || 'http://127.0.0.1', // 远程http服务的本地请求地址
+    port: process.env['http_port_remote'] || 19088, // 远程http服务的本地请求端口
   },
   mqtt: {
-    // endpoint: 'k8913def.ala.cn-hangzhou.emqxsl.cn',
-    endpoint:'broker.emqx.io',
-    port: '1883',
-    username: 'awgnfty/ledongmao',
-    password: 'DyaBAZphfcOZRuEa',
-    requestTopic: 'request',
-    responseTopic: 'response',
-    secretkey: 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',
+    endpoint: process.env['mqtt_endpoint'] || 'broker.emqx.io', // MQTT服务的接入点
+    port: process.env['mqtt_port'] || '1883', // MQTT服务的端口号
+    username: process.env['mqtt_username'] || '', // MQTT用户名
+    password: process.env['mqtt_password'] || '', // MQTT密码
+    requestTopic: process.env['mqtt_requestTopic'] || 'requestTopic',  // 请求Topic
+    responseTopic: process.env['mqtt_responseTopic'] || 'responseTopic',  // 响应Topic
+    secretkey: process.env['mqtt_secretkey'] || 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',  // 加密密钥
   },
 }
+
 console.info('ops:', JSON.stringify(ops))
 
 const mqttOptions = ops.mqtt

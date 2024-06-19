@@ -1,4 +1,5 @@
 /* eslint-disable sort-keys */
+import 'dotenv/config.js'
 import Koa from 'koa'
 // import Router from 'koa-router'
 import bodyParser from 'koa-bodyparser'
@@ -6,18 +7,17 @@ import MQTTHttpSDK from './sdk.js'
 
 const ops: any = {
   http: {
-    port: 3000,
-    host: '',
+    host: process.env['http_host_local'] || 'http://127.0.0.1', // 本地http服务的本地请求地址
+    port: process.env['http_port_local'] || 3000, // 本地http服务的本地请求端口
   },
   mqtt: {
-    // endpoint:'k8913def.ala.cn-hangzhou.emqxsl.cn',
-    endpoint: 'broker.emqx.io',
-    port: '1883',
-    username: 'awgnfty/ledongmao',
-    password: 'DyaBAZphfcOZRuEa',
-    requestTopic: 'request',
-    responseTopic: 'response',
-    secretkey: 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',
+    endpoint: process.env['mqtt_endpoint'] || 'broker.emqx.io', // MQTT服务的接入点
+    port: process.env['mqtt_port'] || '1883', // MQTT服务的端口号
+    username: process.env['mqtt_username'] || '', // MQTT用户名
+    password: process.env['mqtt_password'] || '', // MQTT密码
+    requestTopic: process.env['mqtt_requestTopic'] || 'requestTopic',  // 请求Topic
+    responseTopic: process.env['mqtt_responseTopic'] || 'responseTopic',  // 响应Topic
+    secretkey: process.env['mqtt_secretkey'] || 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',  // 加密密钥
   },
 }
 
@@ -60,6 +60,6 @@ app.use(async (ctx) => {
   }
 })
 
-app.listen(ops.http.port, () => {
+app.listen(Number(ops.http.port), () => {
   console.info(`Server listening on port ${ops.http.port}`)
 })
