@@ -1,5 +1,6 @@
 /* eslint-disable sort-keys */
 import * as mqtt from 'mqtt'
+import { decrypt, encrypt, getKey, DecryptedMessage } from './utils.js'
 
 interface MqttOptions {
   endpoint: string;
@@ -8,6 +9,7 @@ interface MqttOptions {
   password: string;
   requestTopic: string;
   responseTopic: string;
+  secretkey?: string;
 }
 
 class MQTTHttpSDK {
@@ -15,6 +17,7 @@ class MQTTHttpSDK {
   private mqttClient: mqtt.MqttClient
   private requestTopic: string
   private responseTopic: string
+  private secretkey?: string
 
   constructor (mqttOptions: MqttOptions) {
     console.info('mqttOptions:', mqttOptions)
@@ -24,6 +27,7 @@ class MQTTHttpSDK {
     })
     this.requestTopic = mqttOptions.requestTopic
     this.responseTopic = mqttOptions.responseTopic
+    this.secretkey = mqttOptions.secretkey
 
     this.mqttClient.on('connect', () => {
       console.info('Connected to MQTT server')
@@ -65,7 +69,13 @@ class MQTTHttpSDK {
           resolve(responsePayload)
         }
 
-        this.mqttClient.publish(this.requestTopic + '/' + requestId, JSON.stringify({ requestId, payload }), (err) => {
+        let payloadPub = JSON.stringify({ requestId, payload })
+        if (this.secretkey) {
+          const encrypted = encrypt(payloadPub, this.secretkey)
+          payloadPub = JSON.stringify(encrypted)
+        }
+
+        this.mqttClient.publish(this.requestTopic + '/' + requestId, payloadPub, (err) => {
           if (err) {
             responsePayload = {
               status: 500,
@@ -83,7 +93,11 @@ class MQTTHttpSDK {
       this.mqttClient.on('message', (topic, message) => {
         console.info('Received message:', topic, message.toString())
 
-        const messageText = message.toString()
+        let messageText = message.toString()
+        // 如果存在密钥，对收到的消息进行解密
+        if (this.secretkey) {
+          messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, this.secretkey)
+        }
         clearTimeout(timeout)
         responsePayload = JSON.parse(messageText)
         this.mqttClient.unsubscribe(subTopic, (err:any) => {

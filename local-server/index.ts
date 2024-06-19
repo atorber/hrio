@@ -17,6 +17,7 @@ const ops: any = {
     password: 'DyaBAZphfcOZRuEa',
     requestTopic: 'request',
     responseTopic: 'response',
+    secretkey: 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',
   },
 }
 

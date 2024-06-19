@@ -1,6 +1,7 @@
 /* eslint-disable sort-keys */
 import * as mqtt from 'mqtt'
 import axios from 'axios'
+import { decrypt, encrypt, getKey, DecryptedMessage } from './utils.js'
 
 const ops = {
   http: {
@@ -15,6 +16,7 @@ const ops = {
     password: 'DyaBAZphfcOZRuEa',
     requestTopic: 'request',
     responseTopic: 'response',
+    secretkey: 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',
   },
 }
 console.info('ops:', JSON.stringify(ops))
@@ -31,8 +33,15 @@ const responseTopic = mqttOptions.responseTopic
 
 mqttClient.on('message', (topic, message) => {
   console.info('Received message:', topic, message.toString())
+  let messageText = message.toString()
+
+  // 如果存在密钥，对收到的消息进行解密
+  if (ops.mqtt.secretkey) {
+    messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, ops.mqtt.secretkey)
+  }
+
   try {
-    const { requestId, payload } = JSON.parse(message.toString())
+    const { requestId, payload } = JSON.parse(messageText)
     const { method, path, body, headers } = payload
     console.info('requestId:', requestId)
     console.info(`${responseTopic}/${requestId}`)
@@ -46,7 +55,13 @@ mqttClient.on('message', (topic, message) => {
       headers,
     })
       .then((response) => {
-        mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify(response.data))
+        let payload = JSON.stringify(response.data)
+        // 如果存在密钥，对返回的消息进行加密
+        if (ops.mqtt.secretkey) {
+          const encrypted = encrypt(payload, ops.mqtt.secretkey)
+          payload = JSON.stringify(encrypted)
+        }
+        mqttClient.publish(`${responseTopic}/${requestId}`, payload)
         return response
       })
       .catch((error) => {
