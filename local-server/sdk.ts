@@ -26,7 +26,7 @@ class MQTTHttpSDK {
     const ops = {
       password: mqttOptions.password,
       username: mqttOptions.username,
-      clientId: 'local-server',
+      // clientId: 'local-server',
     }
     console.info('ops:', ops)
     this.mqttClient = mqtt.connect(endpoint, ops)
