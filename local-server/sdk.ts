@@ -88,7 +88,10 @@ class MQTTHttpSDK {
         payloadPub = JSON.stringify(encrypted)
         console.info('payloadPub:', payloadPub)
 
-        this.mqttClient.publish(this.requestTopic + '/' + requestId, payloadPub, (err) => {
+        const topic = this.requestTopic + '/' + requestId
+        console.info('topic:', topic)
+
+        this.mqttClient.publish(topic, payloadPub, (err) => {
           if (err) {
             responsePayload = {
               status: 500,

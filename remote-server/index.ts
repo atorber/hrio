@@ -27,7 +27,6 @@ console.info('mqttOptions:', mqttOptions)
 const mqttClient = mqtt.connect(`mqtt://${mqttOptions.endpoint}:${mqttOptions.port}`, {
   password: mqttOptions.password,
   username: mqttOptions.username,
-  clientId: 'remote-server',
 })
 const requestTopic = mqttOptions.requestTopic + '/+'
 const responseTopic = mqttOptions.responseTopic
@@ -74,7 +73,13 @@ mqttClient.on('message', (topic, message) => {
 
 mqttClient.on('connect', () => {
   console.info('Connected to MQTT server')
-  mqttClient.subscribe(requestTopic)
+  mqttClient.subscribe(requestTopic, (err: any) => {
+    if (err) {
+      console.error('Failed to subscribe to topic:', err)
+    } else {
+      console.info('Subscribed to topic:', requestTopic)
+    }
+  })
 })
 
 mqttClient.on('error', (error) => {
