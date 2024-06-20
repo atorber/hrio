@@ -3,7 +3,6 @@ import 'dotenv/config.js'
 import * as mqtt from 'mqtt'
 import axios from 'axios'
 import { decrypt, encrypt, getKey, DecryptedMessage } from './utils.js'
-import { get } from 'http'
 
 const ops: any = {
   http: {
@@ -37,9 +36,9 @@ mqttClient.on('message', (topic, message) => {
   console.info('Received message:', topic, message.toString())
   let messageText = message.toString()
 
-  // 如果存在密钥，对收到的消息进行解密
-  messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, getKey(ops.mqtt.secretkey))
   try {
+    // 对收到的消息进行解密
+    messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, getKey(ops.mqtt.secretkey))
     const { requestId, payload } = JSON.parse(messageText)
     const { method, path, body, headers } = payload
     console.info('requestId:', requestId)
@@ -55,10 +54,11 @@ mqttClient.on('message', (topic, message) => {
     })
       .then((response) => {
         let payload = JSON.stringify(response.data)
+        console.info('response raw:', payload)
         // 如果存在密钥，对返回的消息进行加密
         const encrypted = encrypt(payload, getKey(ops.mqtt.secretkey))
         payload = JSON.stringify(encrypted)
-
+        console.info('response encrypted:', payload)
         mqttClient.publish(`${responseTopic}/${requestId}`, payload)
         return response
       })

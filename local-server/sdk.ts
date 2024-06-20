@@ -44,7 +44,7 @@ class MQTTHttpSDK {
     const subTopic = this.responseTopic + '/' + requestId
     let responsePayload: any
     return new Promise<any>((resolve) => {
-      // 设置15秒超时
+      // 设置30秒超时
       const timeout: any = setTimeout(() => {
         responsePayload = {
           status: 408,
@@ -54,7 +54,7 @@ class MQTTHttpSDK {
           console.error('Unsubscribe error:', err)
         })
         resolve(responsePayload)
-      }, 15000)
+      }, 30000)
 
       this.mqttClient.subscribe(subTopic, (err: any) => {
         if (err) {
@@ -70,10 +70,10 @@ class MQTTHttpSDK {
         }
 
         let payloadPub = JSON.stringify({ requestId, payload })
-        if (this.secretkey) {
-          const encrypted = encrypt(payloadPub, this.secretkey)
-          payloadPub = JSON.stringify(encrypted)
-        }
+
+        const encrypted = encrypt(payloadPub, this.secretkey)
+        payloadPub = JSON.stringify(encrypted)
+        console.info('payloadPub:', payloadPub)
 
         this.mqttClient.publish(this.requestTopic + '/' + requestId, payloadPub, (err) => {
           if (err) {
