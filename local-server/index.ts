@@ -3,7 +3,188 @@ import 'dotenv/config.js'
 import Koa from 'koa'
 // import Router from 'koa-router'
 import bodyParser from 'koa-bodyparser'
-import MQTTHttpSDK from './sdk.js'
+import * as mqtt from 'mqtt'
+import crypto from 'crypto'
+
+// 加密函数
+export function encrypt (payload:string, keyBase64:string) {
+  const key = Buffer.from(keyBase64, 'base64')
+  const iv = crypto.randomBytes(16)
+  const cipher = crypto.createCipheriv('aes-256-cbc', key, iv)
+  let encrypted = cipher.update(payload, 'utf8', 'hex')
+  encrypted += cipher.final('hex')
+  return { data: encrypted, iv: iv.toString('hex') }
+}
+
+export interface DecryptedMessage {
+  iv: string;
+  data: string;
+}
+
+// 解密函数
+export function decrypt (message: DecryptedMessage, keyBase64: string): any {
+  const key = Buffer.from(keyBase64, 'base64')
+  const iv = Buffer.from(message.iv, 'hex')
+  const encryptedText = Buffer.from(message.data, 'hex')
+  const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv)
+
+  // 注意这里的修改
+  let decrypted = decipher.update(encryptedText, undefined, 'utf8')
+  decrypted += decipher.final('utf8')
+
+  return decrypted
+}
+
+// 生成密钥
+export function getKey (key: string): string {
+  const hash = crypto.createHash('sha256')
+  hash.update(key)
+  return hash.digest('base64')
+}
+
+// 使用基础字符串生成密钥
+export function getKeyByBasicString (basicString: string) {
+  const hash = crypto.createHash('sha256')
+  hash.update(basicString)
+  const key = hash.digest('base64')
+  return key
+}
+
+interface MqttOptions {
+  endpoint: string;
+  port: number;
+  username: string;
+  password: string;
+  requestTopic: string;
+  responseTopic: string;
+  secretkey: string;
+}
+
+class MQTTHttpSDK {
+
+  private mqttClient: mqtt.MqttClient
+  private requestTopic: string
+  private responseTopic: string
+  private secretkey: string
+
+  constructor (mqttOptions: MqttOptions) {
+    console.info('mqttOptions:', mqttOptions)
+    const endpoint = `mqtt://${mqttOptions.endpoint}:${mqttOptions.port}`
+    console.info('endpoint:', endpoint)
+    const ops = {
+      password: mqttOptions.password,
+      username: mqttOptions.username,
+      // clientId: 'local-server',
+    }
+    console.info('ops:', ops)
+    this.mqttClient = mqtt.connect(endpoint, ops)
+    this.requestTopic = mqttOptions.requestTopic
+    this.responseTopic = mqttOptions.responseTopic
+    this.secretkey = getKey(mqttOptions.secretkey)
+
+    this.mqttClient.on('connect', () => {
+      console.info('Connected to MQTT server')
+      this.mqttClient.subscribe(this.responseTopic, (err) => {
+        console.error('Subscribe error:', err)
+      })
+    })
+
+    this.mqttClient.on('error', (err) => {
+      console.error('MQTT error:', err)
+    })
+
+    this.mqttClient.on('close', () => {
+      console.info('MQTT connection closed')
+    })
+  }
+
+  public async makeRequest (payload: any): Promise<any> {
+    // Generate a unique request ID for each call
+    const requestId = Math.random().toString(16).substr(2, 8)
+    console.info('requestId:', requestId)
+    const subTopic = this.responseTopic + '/' + requestId
+    let responsePayload: any
+    return new Promise<any>((resolve) => {
+      // 设置30秒超时
+      const timeout: any = setTimeout(() => {
+        responsePayload = {
+          status: 408,
+          body: { error: 'Request timed out' },
+        }
+        this.mqttClient.unsubscribe(subTopic, (err:any) => {
+          console.error('Unsubscribe error:', err)
+        })
+        resolve(responsePayload)
+      }, 30000)
+      console.info('subTopic：\n', subTopic)
+      this.mqttClient.subscribe(subTopic, (err: any) => {
+        if (err) {
+          responsePayload = {
+            status: 500,
+            body: { error: 'Failed to subscribe to topic' },
+          }
+          console.info('subscribe error\n', responsePayload)
+          this.mqttClient.unsubscribe(subTopic, (err:any) => {
+            console.error('Unsubscribe error:', err)
+          })
+          resolve(responsePayload)
+        }
+
+        let payloadPub = JSON.stringify({ requestId, payload })
+
+        const encrypted = encrypt(payloadPub, this.secretkey)
+        payloadPub = JSON.stringify(encrypted)
+        console.info('payloadPub:', payloadPub)
+
+        const topic = this.requestTopic + '/' + requestId
+        console.info('topic:', topic)
+
+        this.mqttClient.publish(topic, payloadPub, (err) => {
+          if (err) {
+            responsePayload = {
+              status: 500,
+              body: { error: 'Failed to publish to topic' },
+            }
+            console.info('publish error\n', responsePayload)
+            this.mqttClient.unsubscribe(subTopic, (err:any) => {
+              console.error('Unsubscribe error:', err)
+            })
+            resolve(responsePayload)
+          }
+        })
+      })
+
+      this.mqttClient.on('message', (topic, message) => {
+        console.info('Received message:', topic, message.toString())
+
+        let messageText = message.toString()
+        // 如果存在密钥，对收到的消息进行解密
+        if (this.secretkey) {
+          messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, this.secretkey)
+        }
+        clearTimeout(timeout)
+        responsePayload = JSON.parse(messageText)
+        this.mqttClient.unsubscribe(subTopic, (err:any) => {
+          console.error('Unsubscribe error:', err)
+        })
+        resolve(responsePayload)
+
+      })
+
+      this.mqttClient.on('error', (err) => {
+        responsePayload = {
+          status: 500,
+          body: { error: err.message },
+        }
+        this.mqttClient.unsubscribe(subTopic, (err:any) => {
+          console.error('Unsubscribe error:', err)
+        })
+        resolve(responsePayload)
+      })
+    })
+  }
+
+}
 
 const ops: any = {
   http: {

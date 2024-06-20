@@ -12,13 +12,8 @@
     "tests/fixtures/smoke-testing.ts",
   ],
   "include": [
-    "bin/*.ts",
-    "examples/**/*.js",
-    "examples/**/*.ts",
-    "scripts/**/*.ts",
-    "src/**/*.ts",
+    "local-server-cfc/**/*.ts",
     "local-server/**/*.ts",
-    "remote-server/**/*.ts",
-    "tests/**/*.spec.ts",
+    "remote-server/**/*.ts"
   ],
 }
