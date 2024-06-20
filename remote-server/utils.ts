@@ -30,8 +30,10 @@ export function decrypt (message: DecryptedMessage, keyBase64: string): any {
 }
 
 // 生成密钥
-export function getKey () {
-  return crypto.randomBytes(32).toString('base64')
+export function getKey (key: string): string {
+  const hash = crypto.createHash('sha256')
+  hash.update(key)
+  return hash.digest('base64')
 }
 
 // 使用基础字符串生成密钥

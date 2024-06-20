@@ -1,6 +1,6 @@
 {
   "name": "hrio",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Using HTTP requests to publish mqtt messages",
   "type": "module",
   "exports": {
@@ -89,10 +89,5 @@
   },
   "publishConfig": {
     "tag": "next"
-  },
-  "git": {
-    "scripts": {
-      "pre-push": "npx git-scripts-pre-push"
-    }
   }
 }

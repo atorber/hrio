@@ -9,7 +9,7 @@ interface MqttOptions {
   password: string;
   requestTopic: string;
   responseTopic: string;
-  secretkey?: string;
+  secretkey: string;
 }
 
 class MQTTHttpSDK {
@@ -17,7 +17,7 @@ class MQTTHttpSDK {
   private mqttClient: mqtt.MqttClient
   private requestTopic: string
   private responseTopic: string
-  private secretkey?: string
+  private secretkey: string
 
   constructor (mqttOptions: MqttOptions) {
     console.info('mqttOptions:', mqttOptions)
@@ -27,7 +27,7 @@ class MQTTHttpSDK {
     })
     this.requestTopic = mqttOptions.requestTopic
     this.responseTopic = mqttOptions.responseTopic
-    this.secretkey = mqttOptions.secretkey
+    this.secretkey = getKey(mqttOptions.secretkey)
 
     this.mqttClient.on('connect', () => {
       console.info('Connected to MQTT server')

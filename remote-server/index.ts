@@ -3,6 +3,7 @@ import 'dotenv/config.js'
 import * as mqtt from 'mqtt'
 import axios from 'axios'
 import { decrypt, encrypt, getKey, DecryptedMessage } from './utils.js'
+import { get } from 'http'
 
 const ops: any = {
   http: {
@@ -16,7 +17,7 @@ const ops: any = {
     password: process.env['mqtt_password'] || '', // MQTT密码
     requestTopic: process.env['mqtt_requestTopic'] || 'requestTopic',  // 请求Topic
     responseTopic: process.env['mqtt_responseTopic'] || 'responseTopic',  // 响应Topic
-    secretkey: process.env['mqtt_secretkey'] || 'VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=',  // 加密密钥
+    secretkey: process.env['mqtt_secretkey'] || '123456',  // 加密密钥
   },
 }
 
@@ -37,10 +38,7 @@ mqttClient.on('message', (topic, message) => {
   let messageText = message.toString()
 
   // 如果存在密钥，对收到的消息进行解密
-  if (ops.mqtt.secretkey) {
-    messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, ops.mqtt.secretkey)
-  }
-
+  messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, getKey(ops.mqtt.secretkey))
   try {
     const { requestId, payload } = JSON.parse(messageText)
     const { method, path, body, headers } = payload
@@ -58,10 +56,9 @@ mqttClient.on('message', (topic, message) => {
       .then((response) => {
         let payload = JSON.stringify(response.data)
         // 如果存在密钥，对返回的消息进行加密
-        if (ops.mqtt.secretkey) {
-          const encrypted = encrypt(payload, ops.mqtt.secretkey)
-          payload = JSON.stringify(encrypted)
-        }
+        const encrypted = encrypt(payload, getKey(ops.mqtt.secretkey))
+        payload = JSON.stringify(encrypted)
+
         mqttClient.publish(`${responseTopic}/${requestId}`, payload)
         return response
       })
