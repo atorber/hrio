@@ -21,10 +21,15 @@ class MQTTHttpSDK {
 
   constructor (mqttOptions: MqttOptions) {
     console.info('mqttOptions:', mqttOptions)
-    this.mqttClient = mqtt.connect(`mqtt://${mqttOptions.endpoint}:${mqttOptions.port}`, {
+    const endpoint = `mqtt://${mqttOptions.endpoint}:${mqttOptions.port}`
+    console.info('endpoint:', endpoint)
+    const ops = {
       password: mqttOptions.password,
       username: mqttOptions.username,
-    })
+      clientId: 'local-server',
+    }
+    console.info('ops:', ops)
+    this.mqttClient = mqtt.connect(endpoint, ops)
     this.requestTopic = mqttOptions.requestTopic
     this.responseTopic = mqttOptions.responseTopic
     this.secretkey = getKey(mqttOptions.secretkey)
@@ -34,6 +39,14 @@ class MQTTHttpSDK {
       this.mqttClient.subscribe(this.responseTopic, (err) => {
         console.error('Subscribe error:', err)
       })
+    })
+
+    this.mqttClient.on('error', (err) => {
+      console.error('MQTT error:', err)
+    })
+
+    this.mqttClient.on('close', () => {
+      console.info('MQTT connection closed')
     })
   }
 
@@ -55,7 +68,7 @@ class MQTTHttpSDK {
         })
         resolve(responsePayload)
       }, 30000)
-
+      console.info('subTopic：\n', subTopic)
       this.mqttClient.subscribe(subTopic, (err: any) => {
         if (err) {
           responsePayload = {
