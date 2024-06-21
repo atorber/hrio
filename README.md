@@ -2,16 +2,22 @@
 
 ## 简介
 
-HRIO-MQTT（HTTP Remote Invocation over MQTT）是一种利用MQTT协议远程调用HTTP API的架构。该架构仿照RPC（远程过程调用）机制，包含一个本地客户端和一个远程服务器。
+![hrio.jpg](./docs/images/hrio.jpg)
+
+HRIO-MQTT（HTTP Remote Invocation over MQTT）是一个利用MQTT协议远程调用HTTP API的代理网关。仿照RPC（远程过程调用）机制，包含一个本地客户端和一个远程服务器。
+
 其工作流程如下：
 
 1. 本地客户端将HTTP请求打包成MQTT消息后发出
-2. 远程服务器接收这些消息，执行对应的HTTP请求，再将响应结果通过MQTT传回客户端。
-这一流程使得本地程序能够调用任何部署在外部或本地服务器上的HTTP API，实现非公网HTTP API服务的远程访问。
+2. 远程服务器接收这些消息，执行对应的HTTP请求，再将响应结果通过MQTT传回客户端
 
-## 接口文档
+HRIO使本地程序能够调用任何部署在外部或本地服务器上的HTTP API，而不需要远程服务器具备公网IP，实现非公网HTTP API服务的远程访问。
 
-[在线接口文档参考](https://www.yuque.com/atorber/chatflow/tcvzdidll89m9qyq)
+使用场景：
+
+- 本地WeChat机器人调用发送消息
+- 远程调用本地电脑或服务器中运行的大模型服务
+- 远程调用一切本地部署的HTTP服务
 
 ## 快速开始
 
@@ -46,7 +52,7 @@ const ops = {
 ```
 
 ```shell
-npm run start:remote
+npm run remote
 ```
 
 ### 启动本地服务
@@ -56,7 +62,7 @@ npm run start:remote
 ```typescript
 const ops: any = {
   http: {
-    port: 3000, // 本地http服务的本地请求端口
+    port: 19088, // 本地http服务的本地请求端口
     host: '', // 本地http服务的本地请求地址
   },
   mqtt: {
@@ -72,36 +78,10 @@ const ops: any = {
 ```
 
 ```shell
-npm run start:local
+npm run local
 ```
 
-## 请求示例
-
-- 请求
-
-```shell
-POST /mqtt?RequestTopic=my/topic&Convert={"transformed":$.original}
-Headers:
-  endpoint: mqtt.example.com
-  username: myuser
-  password: mypassword
-
-Body:
-{
-  "original": "data"
-}
-```
-
-- 响应
-
-```json
-{
-  "error": "ok",
-  "message": {
-    "transformed": "data"
-  }
-}
-```
+假设你在local-server和remote-server中启动的http服务端口一致，现在你可以直接在local-server所在的服务器上调用remote-server服务器中部署的API
 
 ## 历史版本
 
