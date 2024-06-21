@@ -78,11 +78,11 @@ const responseTopic = mqttOptions.responseTopic
 mqttClient.on('message', (topic, message) => {
   console.info('Received message:', topic, message.toString())
   let messageText = message.toString()
-
+  const requestId = topic.split('/')[1]
   try {
     // 对收到的消息进行解密
     messageText = decrypt(JSON.parse(messageText) as DecryptedMessage, getKey(ops.mqtt.secretkey))
-    const { requestId, payload } = JSON.parse(messageText)
+    const { payload } = JSON.parse(messageText)
     const { method, path, body, headers } = payload
     console.info('requestId:', requestId)
     console.info(`${responseTopic}/${requestId}`)
@@ -112,6 +112,7 @@ mqttClient.on('message', (topic, message) => {
 
   } catch (parseError) {
     console.error('Error parsing message:', parseError)
+    mqttClient.publish(`${responseTopic}/${requestId}`, JSON.stringify({ error: parseError }))
   }
 })
 
