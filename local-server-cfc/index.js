@@ -1,83 +1,264 @@
 /* eslint-disable no-undef */
 /* eslint-disable sort-keys */
-const { Http2Mqtt } = require('http2mqtt')
+/* eslint-disable sort-keys */
+require("dotenv/config.js");
+const Koa = require("koa");
+// import bodyParser from 'koa-bodyparser'
+const bodyParser = require("koa-bodyparser");
+// import * as mqtt from 'mqtt'
+const mqtt = require("mqtt");
+// import crypto from 'crypto'
+const crypto = require("crypto");
 
-exports.handler = async (event, context, callback) => {
-  const method = event.httpMethod
-  const path = event.path
-  const headers = event.headers
-  const query = event.queryStringParameters
-  const bodyString = event.body || '{}'
-  const body = JSON.parse(bodyString)
-  const ops = { body, headers, query, method, path }
+// 加密函数
+function encrypt(payload, keyBase64) {
+  const key = Buffer.from(keyBase64, "base64");
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv("aes-256-cbc", key, iv);
+  let encrypted = cipher.update(payload, "utf8", "hex");
+  encrypted += cipher.final("hex");
+  return { data: encrypted, iv: iv.toString("hex") };
+}
 
-  try {
-    const http2mqtt = new Http2Mqtt(ops)
-    const res = await http2mqtt.pubMessage()
+// 解密函数
+function decrypt(message, keyBase64) {
+  const key = Buffer.from(keyBase64, "base64");
+  const iv = Buffer.from(message.iv, "hex");
+  const encryptedText = Buffer.from(message.data, "hex");
+  const decipher = crypto.createDecipheriv("aes-256-cbc", key, iv);
 
-    callback(null, res.body)
-  } catch (err) {
-    console.error(err)
-    callback(err, JSON.stringify({ error: err }))
+  // 注意这里的修改
+  let decrypted = decipher.update(encryptedText, undefined, "utf8");
+  decrypted += decipher.final("utf8");
+
+  return decrypted;
+}
+
+// 生成密钥
+function getKey(key) {
+  const hash = crypto.createHash("sha256");
+  hash.update(key);
+  return hash.digest("base64");
+}
+
+// 使用基础字符串生成密钥
+function getKeyByBasicString(basicString) {
+  const hash = crypto.createHash("sha256");
+  hash.update(basicString);
+  const key = hash.digest("base64");
+  return key;
+}
+
+class MQTTHttpSDK {
+  mqttClient;
+  requestTopic;
+  responseTopic;
+  secretkey;
+
+  constructor(mqttOptions) {
+    console.info("mqttOptions:", mqttOptions);
+    const endpoint = `mqtt://${mqttOptions.endpoint}:${mqttOptions.port}`;
+    console.info("endpoint:", endpoint);
+    const ops = {
+      password: mqttOptions.password,
+      username: mqttOptions.username,
+      // clientId: 'local-server',
+    };
+    console.info("ops:", ops);
+    this.mqttClient = mqtt.connect(endpoint, ops);
+    this.requestTopic = mqttOptions.requestTopic;
+    this.responseTopic = mqttOptions.responseTopic;
+    this.secretkey = getKey(mqttOptions.secretkey);
+
+    this.mqttClient.on("connect", () => {
+      console.info("Connected to MQTT server");
+      this.mqttClient.subscribe(this.responseTopic, (err) => {
+        console.error("Subscribe error:", err);
+      });
+    });
+
+    this.mqttClient.on("error", (err) => {
+      console.error("MQTT error:", err);
+    });
+
+    this.mqttClient.on("close", () => {
+      console.info("MQTT connection closed");
+    });
+  }
+
+  async makeRequest(payload) {
+    // Generate a unique request ID for each call
+    const requestId = Math.random().toString(16).substr(2, 8);
+    console.info("requestId:", requestId);
+    const subTopic = this.responseTopic + "/" + requestId;
+    let responsePayload;
+    return (
+      new Promise() <
+      any >
+      ((resolve) => {
+        // 设置30秒超时
+        const timeout = setTimeout(() => {
+          responsePayload = {
+            status: 408,
+            body: { error: "Request timed out" },
+          };
+          this.mqttClient.unsubscribe(subTopic, (err) => {
+            console.error("Unsubscribe error:", err);
+          });
+          resolve(responsePayload);
+        }, 30000);
+        console.info("subTopic：\n", subTopic);
+        this.mqttClient.subscribe(subTopic, (err) => {
+          if (err) {
+            responsePayload = {
+              status: 500,
+              body: { error: "Failed to subscribe to topic" },
+            };
+            console.info("subscribe error\n", responsePayload);
+            this.mqttClient.unsubscribe(subTopic, (err) => {
+              console.error("Unsubscribe error:", err);
+            });
+            resolve(responsePayload);
+          }
+
+          let payloadPub = JSON.stringify({ requestId, payload });
+
+          const encrypted = encrypt(payloadPub, this.secretkey);
+          payloadPub = JSON.stringify(encrypted);
+          console.info("payloadPub:", payloadPub);
+
+          const topic = this.requestTopic + "/" + requestId;
+          console.info("topic:", topic);
+
+          this.mqttClient.publish(topic, payloadPub, (err) => {
+            if (err) {
+              responsePayload = {
+                status: 500,
+                body: { error: "Failed to publish to topic" },
+              };
+              console.info("publish error\n", responsePayload);
+              this.mqttClient.unsubscribe(subTopic, (err) => {
+                console.error("Unsubscribe error:", err);
+              });
+              resolve(responsePayload);
+            }
+          });
+        });
+
+        this.mqttClient.on("message", (topic, message) => {
+          console.info("Received message:", topic, message.toString());
+
+          let messageText = message.toString();
+          // 如果存在密钥，对收到的消息进行解密
+          if (this.secretkey) {
+            messageText = decrypt(JSON.parse(messageText), this.secretkey);
+          }
+          clearTimeout(timeout);
+          responsePayload = JSON.parse(messageText);
+          this.mqttClient.unsubscribe(subTopic, (err) => {
+            console.error("Unsubscribe error:", err);
+          });
+          resolve(responsePayload);
+        });
+
+        this.mqttClient.on("error", (err) => {
+          responsePayload = {
+            status: 500,
+            body: { error: err.message },
+          };
+          this.mqttClient.unsubscribe(subTopic, (err) => {
+            console.error("Unsubscribe error:", err);
+          });
+          resolve(responsePayload);
+        });
+      })
+    );
   }
 }
 
-// const get = {
-//   resource: '/api/{resource+}',
-//   path: '/api/room/123',
-//   httpMethod: 'GET',
-//   headers: {
-//     Accept: '*/*',
-//     'Accept-Encoding': 'gzip, deflate, br',
-//     Connection: 'close',
-//     'Postman-Token': '67006d25-56ad-475f-bf01-989d91ef52a1',
-//     'User-Agent': 'PostmanRuntime/7.36.1',
-//     'X-Bce-Request-Id': 'c702bb0a-da44-41c8-8c1b-246ff44f1af3',
-//   },
-//   queryStringParameters: {
-//     id: '999999',
-//   },
-//   pathParameters: {
-//     resource: 'room/123',
-//   },
-//   requestContext: {
-//     stage: 'cfc',
-//     requestId: 'c702bb0a-da44-41c8-8c1b-246ff44f1af3',
-//     resourcePath: '/api/{resource+}',
-//     httpMethod: 'GET',
-//     apiId: '3sewxanjdvsbp',
-//     sourceIp: '111.206.214.40',
-//   },
-//   body: '',
-//   isBase64Encoded: false,
-// }
+const ops = {
+  http: {
+    host: process.env["http_host_local"] || "http://127.0.0.1", // 本地http服务的本地请求地址
+    port: process.env["http_port_local"] || 3000, // 本地http服务的本地请求端口
+  },
+  mqtt: {
+    endpoint: process.env["mqtt_endpoint"] || "broker.emqx.io", // MQTT服务的接入点
+    port: process.env["mqtt_port"] || "1883", // MQTT服务的端口号
+    username: process.env["mqtt_username"] || "", // MQTT用户名
+    password: process.env["mqtt_password"] || "", // MQTT密码
+    requestTopic: process.env["mqtt_requestTopic"] || "requestTopic", // 请求Topic
+    responseTopic: process.env["mqtt_responseTopic"] || "responseTopic", // 响应Topic
+    secretkey:
+      process.env["mqtt_secretkey"] ||
+      "VmQAu7/aKEmt2iNIbg3+2HVKzpCRrdN1qelvTfK5gLo=", // 加密密钥
+  },
+};
 
-// const post = {
-//   resource: '/api/{resource+}',
-//   path: '/api/room/123',
-//   httpMethod: 'POST',
-//   headers: {
-//     Accept: '*/*',
-//     'Accept-Encoding': 'gzip, deflate, br',
-//     Connection: 'close',
-//     'Content-Length': '19',
-//     'Content-Type': 'application/json',
-//     'Postman-Token': 'fd4e69e5-dc07-4d06-98cb-87cba9b9b599',
-//     'User-Agent': 'PostmanRuntime/7.36.1',
-//     'X-Bce-Request-Id': '7e99b78e-bd68-4556-9d58-4b36525bf0b8',
-//   },
-//   queryStringParameters: {},
-//   pathParameters: {
-//     resource: 'room/123',
-//   },
-//   requestContext: {
-//     stage: 'cfc',
-//     requestId: '7e99b78e-bd68-4556-9d58-4b36525bf0b8',
-//     resourcePath: '/api/{resource+}',
-//     httpMethod: 'POST',
-//     apiId: '3sewxanjdvsbp',
-//     sourceIp: '111.206.214.40',
-//   },
-//   body: '{\n    "id":999999\n}',
-//   isBase64Encoded: false,
+console.info("ops:", JSON.stringify(ops));
+
+// 这里将MQTT服务器和Topic硬编码，实际上应该配置化
+const mqttSdk = new MQTTHttpSDK(ops.mqtt);
+
+const app = new Koa();
+
+app.use(bodyParser());
+
+// 这个中间件将捕获所有进入的HTTP请求
+app.use(async (ctx) => {
+  console.info(
+    "Received request:",
+    ctx.method,
+    ctx.url,
+    ctx.request.body,
+    ctx.headers
+  );
+  // 获取请求的Method, Path和Body
+  const method = ctx.method;
+  const path = ctx.url;
+  const body = ctx.request.body;
+  const headers = ctx.headers;
+
+  const payload = {
+    method,
+    path,
+    body,
+    headers,
+  };
+
+  try {
+    // 使用MQTT SDK发送请求并等待响应
+    const response = await mqttSdk.makeRequest(payload);
+
+    // 设置响应状态码和主体（这里假设响应是成功的，并且是JSON格式）
+    ctx.status = 200;
+    ctx.body = response;
+  } catch (error) {
+    // 如果出错，返回错误信息
+    ctx.status = 500;
+    ctx.body = { error: error.message };
+  }
+});
+
+app.listen(Number(ops.http.port), () => {
+  console.info(`Server listening on port ${ops.http.port}`);
+});
+
+// exports.handler = async (event, context, callback) => {
+//   const method = event.httpMethod
+//   const path = event.path
+//   const headers = event.headers
+//   const query = event.queryStringParameters
+//   const bodyString = event.body || '{}'
+//   const body = JSON.parse(bodyString)
+//   const ops = { body, headers, query, method, path }
+
+//   try {
+//     const http2mqtt = new Http2Mqtt(ops)
+//     const res = await http2mqtt.pubMessage()
+
+//     callback(null, res.body)
+//   } catch (err) {
+//     console.error(err)
+//     callback(err, JSON.stringify({ error: err }))
+//   }
 // }

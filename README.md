@@ -18,6 +18,7 @@ HRIO使本地程序能够调用任何部署在外部或本地服务器上的HTTP
 - 本地WeChat机器人调用发送消息
 - 远程调用本地电脑或服务器中运行的大模型服务
 - 远程调用一切本地部署的HTTP API
+- 在函数计算中部署local-server搭建自己的外网API，随时随地调用
 
 ## 快速开始
 
@@ -83,8 +84,6 @@ npm run local
 
 假设你在local-server和remote-server中启动的http服务端口一致，现在你可以直接在local-server所在的服务器上调用remote-server服务器中部署的API
 
-## 历史版本
+## 无服务API部署
 
-### v0.0.1
-
-1. 初始化创建代码库
+在阿里云、腾讯云的函数计算中部署local-server-cfc，实现不需要购买服务器即可得到一个API服务，利用树莓派、NAS搭建自己的公网服务
