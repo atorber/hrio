@@ -1,14 +1,9 @@
 {
   "extends": "@chatie/tsconfig",
   "compilerOptions": {
-    "module": "CommonJS",
-    "target": "ES6",
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "outDir": "dist/esm",
+    "ignoreDeprecations": "5.0",
+    "esModuleInterop":true,
   },
   "exclude": [
     "node_modules/",
